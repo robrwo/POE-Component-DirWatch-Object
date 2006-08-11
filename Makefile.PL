@@ -4,7 +4,6 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile
     (
-     (MM->can('signature_target') ? (SIGN => 1) : ()),
      NAME                => 'POE::Component::DirWatch::Object',
      AUTHOR              => 'Guillermo Roditi <groditi@cpan.org>',
      VERSION_FROM        => 'lib/POE/Component/DirWatch/Object.pm',

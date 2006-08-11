@@ -10,4 +10,3 @@ t/distribution.t
 t/boilerplate.t
 t/pod-coverage.t
 t/pod.t
-SIGNATURE                                Public-key signature (added by MakeMaker)

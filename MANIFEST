@@ -4,6 +4,7 @@ META.yml # Will be created by "make dist"
 Makefile.PL
 README
 lib/POE/Component/DirWatch/Object.pm
+lib/POE/Component/DirWatch/Object/NewFile.pm
 t/00-load.t
 t/01-basic.t
 t/distribution.t

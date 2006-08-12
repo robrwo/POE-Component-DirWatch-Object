@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 use File::Spec;
 use DirHandle;
 use Carp;
@@ -21,6 +21,8 @@ has 'directory' => (is => 'rw', isa => 'Str',     required => 1);
 has 'interval'  => (is => 'rw', isa => 'Int',     required => 1, default => 1);
 has 'filter'    => (is => 'rw', isa => 'CodeRef', required => 1, 
 		    default => sub { sub{ -f $_[1]; } }); #holler
+has 'dispatch_list'  => (is => 'rw', isa => 'ArrayRef', auto_deref => 1);
+
 
 sub BUILD{
     my ($self, $args) = @_;
@@ -35,6 +37,7 @@ sub BUILD{
 		    shutdown => '_shutdown',
 		    poll     => '_poll',
 		    callback => '_callback',
+		    dispatch => '_dispatch',
 		   },
 	 ]
 	);
@@ -75,14 +78,23 @@ sub _poll{
 
     $self->dir_handle->rewind;	# rewind to directory start
 
+    my @queue;
     # look for a file that matches our filter and report it
     for my $file ($self->dir_handle->read()) {
 	my @params = ($file, File::Spec->catfile($self->directory, $file) );
-	$kernel->yield(callback => @params) if $self->_filter(@params);
+	push(@queue, \@params) if $self->_filter(@params);
     }
+    
+    $self->dispatch_list( \@queue );
+    $kernel->yield('dispatch');
 
     # arrange to be called again soon
     $kernel->delay(poll => $self->interval);
+}
+
+sub _dispatch{
+    my ($self, $kernel) = @_[OBJECT, KERNEL];
+    $kernel->yield(callback => @$_) foreach $self->dispatch_list;
 }
 
 sub _callback{
@@ -192,70 +204,107 @@ If not specified, defaults to C<sub { -f $_[1] }>.
 =back
 
 =head1 Accessors
+
 Note: You should never have to use any of these unless you are subclassing.
 For most tasks you should be able to implement any functionality you need without
 ever dealing with these objects. That being said, hacking is fun.
 
 =head2 alias
+
 Read-only. Returns the alias of the POE session. Maybe allow a way to rename the 
 session during runtime?
 
 =head2 session
+
 Read-only; Returns a reference to the actual POE session.
 Please avoid this unless you are subclassing. Even then it is recommended that 
-it is always used as $watcher->session->method because copying the object 
+it is always used as C<$watcher->session->method> because copying the object 
 reference around could create a problem with lingering references.
 
 =head2 directory
+
 Read-only; Returns the directory we are currently watching
 TODO: allow dir to change during runtime
 
 =head2 dir_handle
+
 Read-only; Returns a reference to a L<DirHandle> object
 
 =head2 filter
+
 Read-Write; Returns the coderef being used to filter files.
 
 =head2 interval
+
 Read-Write; Returns the interval in seconds that the polling routine
 wait after it is done running and before it runs again. This is NOT
 the time between the start of polls, it is the time between the end of one 
 poll and the start of another.
 
 =head2 callback
+
 Read-Write; Returns the coderef being called when a file is found.
 
+=head2 dispatch_list
+
+Read-Write; Returns a list of the files enqueued to be processed. Messing with this
+C<before 'dispatch'> is the preferred way of messing with the list of files to be processed
+other than C<filter>
+
 =head1 Private methods
+
 These methods are documented here just in case you subclass. Please
 do not call them directly. If you are wondering why some are needed it is so 
-Moose's 'before' and 'after' work.
+Moose's C<before> and C<after> work.
 
 =head2 _filter
+
 Code provided because it's more explanatory.
 sub _filter{ return shift->filter->(@_) }
 
 =head2 _callback
+
 Code provided because it's more explanatory.
 sub _filter{ return shift->filter->(@_) }
 
 =head2 _start
-Runs when $poe_kernel->run is called. It will create a new DirHandle watching
-to $watcher->directory, set the session's alias and schedule the first _poll.
+
+Runs when C<$poe_kernel->run> is called. It will create a new DirHandle watching
+to C<$watcher->directory>, set the session's alias and schedule the first C<poll> event.
 
 =head2 _poll
-This is the re-occurring action. Every time it runs it will search for files,
-_filter() them, and then _callback() with matches.
+
+Triggered by the C<poll> event this is the re-occurring action. Every time it runs it will 
+search for files, C<_filter()> them, store the matching files as a list and trigger the 
+C<dispatch> event.
+
+=head2 _dispatch
+
+Triggered, by the C<dispatch> event this method will iterate through C<$self->dispatch_list>
+ and send a C<callback> event for every file in the dispatch list. 
+
+=head2 _pause
+
+This is a TODO. email with suggestions as to how you'd like it to work.
+
+=head2 _resume
+
+This is a TODO. email with suggestions as to how you'd like it to work.
 
 =head2 _stop
+
 Close that filehandle.
 
 =head2 _shutdown
-Delete the heap, remove the alias we are using and remove all set alarms.
+
+Delete the C<heap>, remove the alias we are using and remove all set alarms.
 
 =head2 BUILD
-Constructor. create()s a POE::Session and stores it in $self->session.
+
+Constructor. C<create()>s a L<POE::Session> and stores it in C<$self->session>.
 
 =head2 meta
+
 Todo
 
 =head1 TODO
@@ -266,7 +315,7 @@ Todo
 
 =item Spin the directory polling into an async operation.
 
-=item Enable suspend / wakeup functionality
+=item Enable pause / resume functionality
 
 =item Allow user to change the directory watched during runtime.
 
@@ -286,6 +335,9 @@ Please see L<Moose> for the proper way to subclass this. And please remember to
 shift $self out of @_ on any functions called by POE directly so that you don't screw
 up the named @_ positions (@_[KERNEL, HEAP, ...])
 
+Also check out L<POE::Component::DirWatch::Object::NewFile> for a simple example of
+how to extend functionality.
+
 =head1 SEE ALSO
 
 L<POE>, L<POE::Session>, L<POE::Component>, L<POE::Component::DirWatch>, L<Moose>
@@ -299,6 +351,8 @@ Eric Cholet, <cholet@logilune.com>
 (I also copy pasted some POD)
 
 =head1 BUGS
+
+Holler?
 
 Please report any bugs or feature requests to
 C<bug-poe-component-dirwatch-object at rt.cpan.org>, or through the web interface at

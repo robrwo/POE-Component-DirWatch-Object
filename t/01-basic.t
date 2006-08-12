@@ -47,7 +47,7 @@ sub _tstart {
 	     alias      => 'dirwatch_test',
 	     directory  => $DIR,
 	     callback   => \&file_found,
-	     interval   => 5,
+	     interval   => 1,
 	    );
 
 	ok($watcher->alias eq 'dirwatch_test');

@@ -1,9 +1,14 @@
 Revision history for POE-Component-DirWatch-Object
 
+0.04    Aug 15, 2006
+        I still suck at POD.
+	NewFile can now pick up edited files
+	added new test to new file and fixed MANIFEST	
+
 0.03    Aug 11, 2006
         I suck at POD.
-	Add dispatch event && &_dispatch to improve filtering	
-	Add Object::NewFile as an example of how to extend the class
+        Add dispatch event && &_dispatch to improve filtering   
+        Add Object::NewFile as an example of how to extend the class
 
 0.02    Aug 10, 2006
         Signatures Suck

@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.03";
+our $VERSION = "0.04";
 use File::Spec;
 use DirHandle;
 use Carp;
@@ -218,7 +218,7 @@ session during runtime?
 
 Read-only; Returns a reference to the actual POE session.
 Please avoid this unless you are subclassing. Even then it is recommended that 
-it is always used as C<$watcher->session->method> because copying the object 
+it is always used as C<$watcher-E<gt>session-E<gt>method> because copying the object 
 reference around could create a problem with lingering references.
 
 =head2 directory
@@ -260,17 +260,17 @@ Moose's C<before> and C<after> work.
 =head2 _filter
 
 Code provided because it's more explanatory.
-sub _filter{ return shift->filter->(@_) }
+C<sub _filter{ return shift-E<gt>filter-E<gt>(@_) }>
 
 =head2 _callback
 
 Code provided because it's more explanatory.
-sub _filter{ return shift->filter->(@_) }
+C<sub _filter{ return shift-E<gt>filter-E<gt>(@_) }>
 
 =head2 _start
 
-Runs when C<$poe_kernel->run> is called. It will create a new DirHandle watching
-to C<$watcher->directory>, set the session's alias and schedule the first C<poll> event.
+Runs when C<$poe_kernel-E<gt>run> is called. It will create a new DirHandle watching
+to C<$watcher-E<gt>directory>, set the session's alias and schedule the first C<poll> event.
 
 =head2 _poll
 
@@ -280,7 +280,7 @@ C<dispatch> event.
 
 =head2 _dispatch
 
-Triggered, by the C<dispatch> event this method will iterate through C<$self->dispatch_list>
+Triggered, by the C<dispatch> event this method will iterate through C<$self-E<gt>dispatch_list>
  and send a C<callback> event for every file in the dispatch list. 
 
 =head2 _pause
@@ -301,7 +301,7 @@ Delete the C<heap>, remove the alias we are using and remove all set alarms.
 
 =head2 BUILD
 
-Constructor. C<create()>s a L<POE::Session> and stores it in C<$self->session>.
+Constructor. C<create()>s a L<POE::Session> and stores it in C<$self-E<gt>session>.
 
 =head2 meta
 

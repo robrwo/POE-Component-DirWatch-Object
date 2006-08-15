@@ -7,6 +7,8 @@ lib/POE/Component/DirWatch/Object.pm
 lib/POE/Component/DirWatch/Object/NewFile.pm
 t/00-load.t
 t/01-basic.t
+t/02-newfile.t
+t/03-editedfile.t
 t/distribution.t
 t/boilerplate.t
 t/pod-coverage.t

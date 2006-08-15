@@ -3,10 +3,11 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 extends 'POE::Component::DirWatch::Object';
 has 'seen_files' => (is => 'rw', isa => 'HashRef');
+has 'edited'     => (is => 'rw', isa => 'Bool', required => 1, default => 0);
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
 
@@ -15,18 +16,30 @@ before '_dispatch' => sub{
     my $self = shift;
     my $seen = $self->seen_files;
     my @n_list = grep{ !exists($seen->{ $_->[1] }) } $self->dispatch_list;
-    $seen->{$_->[1]} = 1 foreach @n_list;
+    
+    #if not reprocessing change the last change date every cycle so that if
+    # turned on during runtime it only picks up edited files going forward
+    unless($self->edited){ $seen->{$_} = (stat($_))[9] foreach keys %$seen; }
+
+    $seen->{$_->[1]} = (stat($_->[1]))[9] foreach @n_list;
 
     # yeah i could do this with less vars but honestly, fuck it
     $self->dispatch_list( \@n_list );
 };
 
-#clean seen files that no longer exist
+#clean seen files that no longer exist or have been modified
 before '_poll' => sub {
     my $self = shift;
     my $seen = $self->seen_files;
-    my %n_seen = map {$_ => 1} grep { -e $_ } keys %$seen;
-    $self->seen_files(\ %n_seen);
+
+    if($self->edited){
+	my %n_seen = map {$_ => $seen->{$_}} 
+	    grep { -e $_  && $seen->{$_} == (stat($_))[9] } keys %$seen;
+	$self->seen_files(\ %n_seen);
+    } else{
+    	my %n_seen = map {$_ => $seen->{$_}} grep { -e $_  } keys %$seen;
+	$self->seen_files(\ %n_seen);
+    }
 };
 
 
@@ -54,6 +67,7 @@ POE::Component::DirWatch::Object::NewFile
      filter     => sub { $_[0] =~ /\.gz$/ && -f $_[1] },
      callback   => \&some_sub,
      interval   => 1,
+     edited     => 1,   #pick up files that have been edited since last poll
     );
 
   $poe_kernel->run;
@@ -68,13 +82,20 @@ exclude files that have already been processed
 =head2 seen_files
 
 Read-write. Will return a hash ref in with keys will be the full path 
-of all previously processed documents that still exist in the file system.
+of all previously processed documents that still exist in the file system and the
+values are the last changed dates of the files.
+
+=head2 edited
+
+Read-Write. A boolean value, if set to true it will re-process edited files. If changed 
+during runtime to true it will only pick up files that whose last edited date changed
+after C<edited> was set to true. 
 
 =head1 Extended methods
 
 =head2 dispatch
 
-C<before 'dispatch'> the dipatch list is compared against C<$self->seen_files>
+C<before 'dispatch'> the dipatch list is compared against C<$self-E<gt>seen_files>
 and previously seen files are dropped from that list. at the end it adds all new
 files to the list of known files.
 
@@ -98,10 +119,8 @@ Guillermo Roditi, <groditi@cpan.org>
 
 =head1 BUGS
 
-The idea behind cleaning the seen list is that if a new file with the same name comes again 
-it will also be processed, and to keep memory use down. The bad part is that this happens 
-only before the system is polled, which means that if a file is removed and recreated between
-polls the new one will not be processed. 
+If a file is created and deleted between polls it will never be seen. Also if a file
+is edited more than once in between polls it will never be picked up.
 
 Please report any bugs or feature requests to
 C<bug-poe-component-dirwatch-object at rt.cpan.org>, or through the web interface at

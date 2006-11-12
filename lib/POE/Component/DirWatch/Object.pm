@@ -3,46 +3,47 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.04";
+our $VERSION = "0.06";
 use File::Spec;
-use DirHandle;
 use Carp;
 use POE;
+#use IO::AIO;
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
-##TODO: these should be ro. but idont kow how it works
-has 'session'    => (is => 'rw', isa => 'Object', weak_ref => 1);
-has 'dir_handle' => (is => 'rw', isa => 'Object');
 has 'alias'      => (is => 'rw', isa => 'Str', required => 1, 
 		     default => 'dirwatch');
 
-has 'callback'  => (is => 'rw', isa => 'CodeRef', required => 1);
-has 'directory' => (is => 'rw', isa => 'Str',     required => 1);
-has 'interval'  => (is => 'rw', isa => 'Int',     required => 1, default => 1);
+has 'next_poll' => (is => 'rw', isa => 'Int');
+has 'callback'  => (is => 'rw', isa => 'Ref', required => 1);
+has 'directory' => (is => 'rw', isa => 'Str', required => 1);
+has 'interval'  => (is => 'rw', isa => 'Int', required => 1, default => 1);
 has 'filter'    => (is => 'rw', isa => 'CodeRef', required => 1, 
 		    default => sub { sub{ -f $_[1]; } }); #holler
-has 'dispatch_list'  => (is => 'rw', isa => 'ArrayRef', auto_deref => 1);
-
 
 sub BUILD{
     my ($self, $args) = @_;
 
-    my $s = POE::Session->create
-	(
-	 object_states  =>
-	 [
-	  $self,  {
-		    _start   => '_start',
-		    _stop    => '_stop',
-		    shutdown => '_shutdown',
-		    poll     => '_poll',
-		    callback => '_callback',
-		    dispatch => '_dispatch',
-		   },
-	 ]
-	);
+    #my $s = 
+    POE::Session->create
+	  (
+	   object_states  =>
+	   [
+	    $self,  {
+		     _start   => '_start',
+		     _pause   => '_pause',
+		     _resume  => '_resume',
+		     shutdown => '_shutdown',
+		     poll     => '_poll',
+		     callback => '_callback',
+		     dispatch => '_dispatch',
+		    },
+	   ]
+	  );
+}
 
-    $self->session($s);
+sub session{
+    my $self = shift;
+    return $poe_kernel->alias_resolve( $self->alias );
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
@@ -51,60 +52,86 @@ sub _start{
 
     # set alias for ourselves and remember it
     $kernel->alias_set($self->alias);
-
-    # open the directory handle
-    $self->dir_handle(DirHandle->new($self->directory));
-    croak("Can't open ".$self->directory().": $!\n") unless $self->dir_handle;
-
     # set up polling
-    $kernel->delay(poll => $self->interval);
+    $self->next_poll( $kernel->delay_set(poll => $self->interval) );
 }
 
+sub _pause{
+    my ($self, $kernel, $until) = @_[OBJECT, KERNEL, ARG0];
+    $kernel->alarm_remove($self->next_poll) if $self->next_poll;
+    return unless defined $until;
+
+    my $t = time;
+    $self->next_poll( $kernel->delay_set(poll => $until) )if($until <  time);
+    $self->next_poll( $kernel->alarm_set(poll => $until) )if($until >= time);
+}
+
+sub _resume{
+    my ($self, $kernel, $until) = @_[OBJECT, KERNEL, ARG0];
+    $kernel->alarm_remove($self->next_poll) if $self->next_poll;
+    $until = 0 unless defined $until;
+
+    my $t = time;
+    $self->next_poll( $kernel->delay_set(poll => $until) )if($until <  time);
+    $self->next_poll( $kernel->alarm_set(poll => $until) )if($until >= time);
+}
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
-sub _stop{
-    my $self = $_[OBJECT];
 
-    # close the directory handle
-    $self->dir_handle->close if $self->dir_handle;
+sub pause{
+    my ($self, $until) = @_;
+    $poe_kernel->call($self->alias, _pause => $until);
+}
+
+sub resume{
+    my ($self, $when) = @_;
+    $poe_kernel->call($self->alias, _resume => $when);
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
 sub _poll{
     my ($self, $kernel) = @_[OBJECT, KERNEL];
+    $self->next_poll( undef );
 
-    # make sure we have a directory handle
-    $self->dir_handle or croak "Need to run() before poll()\n";
+    #AIO?? maybe one day...
+    #aio_readdir($self->directory, sub{ $self->_aio_callback(@_) } );
 
-    $self->dir_handle->rewind;	# rewind to directory start
-
-    my @queue;
-    # look for a file that matches our filter and report it
-    for my $file ($self->dir_handle->read()) {
-	my @params = ($file, File::Spec->catfile($self->directory, $file) );
-	push(@queue, \@params) if $self->_filter(@params);
-    }
+    #until i figure out AIO this will have to be good enough
+    opendir(DIR, $self->directory) || croak "Failed to open '".$self->directory."':  $!";
+    my @files = grep { $_ !~ /^\.\.?$/ } readdir(DIR);
+    closedir DIR;
+    $self->_aio_callback(\@files);
     
-    $self->dispatch_list( \@queue );
-    $kernel->yield('dispatch');
-
-    # arrange to be called again soon
-    $kernel->delay(poll => $self->interval);
 }
 
-sub _dispatch{
-    my ($self, $kernel) = @_[OBJECT, KERNEL];
-    $kernel->yield(callback => @$_) foreach $self->dispatch_list;
+sub _aio_callback{
+    my ($self, $files) = @_;
+
+    $self->next_poll( $poe_kernel->delay_set(poll => $self->interval) );
+    return unless ref $files;
+
+    $poe_kernel->yield(dispatch => $_, File::Spec->catfile($self->directory, $_)) 
+	foreach (@$files);
+}
+
+sub _dispatch {
+    my ($self, $kernel, $fname, $fpath) = @_[OBJECT, KERNEL, ARG0, ARG1];
+    $kernel->yield(callback => [$fname, $fpath]) 
+	if $self->filter->($fname,$fpath);
 }
 
 sub _callback{
-    my $self = $_[OBJECT];
-    return $self->callback->(@_);
-}
+    my ($self, $args) = @_[OBJECT, ARG0];    
+    my $cb = $self->callback;
 
-sub _filter{
-    my $self = shift;  #fine to shift here
-    return $self->filter->(@_);
+    if( ref $cb eq 'ARRAY' ){
+	my ($obj, $method) = @$cb;
+	$obj->$method(@$args);
+	return;
+    }    
+
+    $cb->(@$args) if( ref $cb eq 'CODE');
+    return;
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
@@ -118,6 +145,7 @@ sub _shutdown {
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
+
 1;
 
 __END__;
@@ -137,6 +165,8 @@ POE::Component::DirWatch::Object - POE directory watcher object
      directory  => '/some_dir',
      filter     => sub { $_[0] =~ /\.gz$/ && -f $_[1] },
      callback   => \&some_sub,
+     # OR
+     callback   => [$obj, 'some_sub'], #if you want $obj->some_sub 
      interval   => 1,
     );
 
@@ -158,18 +188,38 @@ directory, such as an FTP upload directory.
 
 =head2 new( \%attrs)
 
-=over 4
+  See SYNOPSIS and Accessors / Attributes below.
 
-=item alias
+=head2 session
+
+Returns a reference to the actual POE session.
+Please avoid this unless you are subclassing. Even then it is recommended that 
+it is always used as C<$watcher-E<gt>session-E<gt>method> because copying the object 
+reference around could create a problem with lingering references.
+
+=head2 pause [$until]
+
+Synchronous call to _pause. This just posts an immediate _pause event to the kernel.
+Safe for use outside of POEish land (doesnt use @_[KERNEL, ARG0...])
+
+=head2 resume [$when]
+
+Synchronous call to _resume. This just posts an immediate _resume event to the kernel.
+Safe for use outside of POEish land (doesnt use @_[KERNEL, ARG0...])
+
+=head1 Accessors / Attributes
+
+=head2 alias
 
 The alias for the DirWatch session.  Defaults to C<dirwatch> if not
-specified.
+specified. You can NOT rename a session at runtime.
 
-=item directory
+=head2 directory
 
-The path of the directory to watch. This is a required argument.
+This is a required argument during C<new>.
+The path of the directory to watch. 
 
-=item interval
+=head2 interval
 
 The interval waited between the end of a directory poll and the start of another.
  Default to 1 if not specified. 
@@ -178,18 +228,29 @@ WARNING: This is number NOT the interval between polls. A lengthy blocking callb
 high-loads, or slow applications may delay the time between polls. You can see:
 L<http://poe.perl.org/?POE_Cookbook/Recurring_Alarms> for more info.
 
-=item callback
+=head2 callback
 
-A reference to a subroutine that will be called when a matching
-file is found in the directory.
+This is a required argument during C<new>.
+The code to be called when a matching file is found.
 
-This subroutine is called with two arguments: the name of the
-file, and its full pathname. It usually makes most sense to process
-the file and remove it from the directory.
+The code called will be passed 2 arguments, the $filename and $filepath.
+This may take 2 different values. A 2 element arrayref or a single coderef.
+When given an arrayref the first item will be treated as an object and the
+second as a method name. See the SYNOPSYS.
 
-This is a required argument.
+It usually makes most sense to process the file and remove it from the directory.    
 
-=item filter
+    #Example
+    callback => sub{ my($filename, $fullpath) = @_ }
+    # OR
+    callback => [$obj, 'mymethod']
+
+    #Where my method looks like:
+    sub mymethod {
+        my ($self, $filename, $fullpath) = @_;
+    ...
+
+=head2 filter
 
 A reference to a subroutine that will be called for each file
 in the watched directory. It should return a TRUE value if
@@ -201,71 +262,15 @@ file, and its full pathname.
 
 If not specified, defaults to C<sub { -f $_[1] }>.
 
-=back
+=head2 next_poll
 
-=head1 Accessors
-
-Note: You should never have to use any of these unless you are subclassing.
-For most tasks you should be able to implement any functionality you need without
-ever dealing with these objects. That being said, hacking is fun.
-
-=head2 alias
-
-Read-only. Returns the alias of the POE session. Maybe allow a way to rename the 
-session during runtime?
-
-=head2 session
-
-Read-only; Returns a reference to the actual POE session.
-Please avoid this unless you are subclassing. Even then it is recommended that 
-it is always used as C<$watcher-E<gt>session-E<gt>method> because copying the object 
-reference around could create a problem with lingering references.
-
-=head2 directory
-
-Read-only; Returns the directory we are currently watching
-TODO: allow dir to change during runtime
-
-=head2 dir_handle
-
-Read-only; Returns a reference to a L<DirHandle> object
-
-=head2 filter
-
-Read-Write; Returns the coderef being used to filter files.
-
-=head2 interval
-
-Read-Write; Returns the interval in seconds that the polling routine
-wait after it is done running and before it runs again. This is NOT
-the time between the start of polls, it is the time between the end of one 
-poll and the start of another.
-
-=head2 callback
-
-Read-Write; Returns the coderef being called when a file is found.
-
-=head2 dispatch_list
-
-Read-Write; Returns a list of the files enqueued to be processed. Messing with this
-C<before 'dispatch'> is the preferred way of messing with the list of files to be processed
-other than C<filter>
+The ID of the alarm for the next scheduled poll, if any.
 
 =head1 Private methods
 
 These methods are documented here just in case you subclass. Please
 do not call them directly. If you are wondering why some are needed it is so 
 Moose's C<before> and C<after> work.
-
-=head2 _filter
-
-Code provided because it's more explanatory.
-C<sub _filter{ return shift-E<gt>filter-E<gt>(@_) }>
-
-=head2 _callback
-
-Code provided because it's more explanatory.
-C<sub _filter{ return shift-E<gt>filter-E<gt>(@_) }>
 
 =head2 _start
 
@@ -274,26 +279,53 @@ to C<$watcher-E<gt>directory>, set the session's alias and schedule the first C<
 
 =head2 _poll
 
-Triggered by the C<poll> event this is the re-occurring action. Every time it runs it will 
-search for files, C<_filter()> them, store the matching files as a list and trigger the 
-C<dispatch> event.
+Triggered by the C<poll> event this is the re-occurring action. _poll will use get a 
+list of all files in the directory and call C<_aio_callback> with the list of filenames (if any) 
+
+I promise I will make this async soon, it's just that IO::AIO doesnt work on FreeBSD.
+
+=head2 _aio_callback
+
+Schedule the next poll and dispatch any files found.
 
 =head2 _dispatch
 
-Triggered, by the C<dispatch> event this method will iterate through C<$self-E<gt>dispatch_list>
- and send a C<callback> event for every file in the dispatch list. 
+Triggered by the C<dispatch> event, it recieves a filename in ARG0, it then proceeds to
+run the file through the filter and schedule a callback.
 
-=head2 _pause
+=head2 _callback
 
-This is a TODO. email with suggestions as to how you'd like it to work.
+Triggered by the C<callback> event, it  derefernces the argument list that is passed to
+it in ARG0 and calls the appropriate coderef or object-method pair with 
+$filename and $fullpath in @_;
 
-=head2 _resume
+=head2 _pause [$until]
 
-This is a TODO. email with suggestions as to how you'd like it to work.
+Triggered by the C<_pause> event this method will remove the alarm scheduling the 
+next directory poll. It takes an optional argument of $until, which dictates when the 
+polling should begin again. If $until is an integer smaller than the result of time()
+it will treat $until as the number of seconds to wait before polling. If $until is an
+integer larger than the result of time() it will treat $until as an epoch timestamp
+and schedule the poll alarm accordingly. 
 
-=head2 _stop
+     #these two are the same thing
+     $watcher->pause( time() + 60);
+     $watcher->pause( 60 );
 
-Close that filehandle.
+     #this is one also the same
+     $watcher->pause;
+     $watcher->resume( 60 );
+
+
+=head2 _resume [$when]
+
+Triggered by the C<_resume> event this method will remove the alarm scheduling the 
+next directory poll (if any) and schedule a new poll alarm. It takes an optional 
+argument of $when, which dictates when the polling should begin again. If $when is 
+an integer smaller than the result of time() it will treat $until as the number of 
+seconds to wait before polling. If $until is an integer larger than the result of 
+time() it will treat $when as an epoch timestamp and schedule the poll alarm 
+accordingly. If not specified, the alarm will be scheduled with a delay of zero.
 
 =head2 _shutdown
 
@@ -313,17 +345,11 @@ Todo
 
 =item Use C<Win32::ChangeNotify> on Win32 platforms for better performance.
 
-=item Spin the directory polling into an async operation.
-
-=item Enable pause / resume functionality
-
 =item Allow user to change the directory watched during runtime.
 
 =item ImproveDocs
 
 =item Write some tests. (after I read PDN and learn how)
-
-=item Figure out why stringifying breaks things so I can add it
 
 =item Figure out why taint mode fails
 
@@ -401,6 +427,8 @@ People who answered way too many questions from an inquisitive idiot:
 =item Rocco Caputo
 
 =item Charles Reiss
+
+=item Stevan Little
 
 =back
 

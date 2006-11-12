@@ -1,31 +1,40 @@
-package POE::Component::DirWatch::Object::NewFile;
+package POE::Component::DirWatch::Object::Touched;
 use strict;
 use warnings;
 use Moose;
+use Array::Compare;
 use POE;
 
 our $VERSION = "0.02";
 
-extends 'POE::Component::DirWatch::Object';
+extends 'POE::Component::DirWatch::Object::NewFile';
 
-has 'seen_files' => (is => 'rw', isa => 'HashRef', default => sub{{}});
+has 'cmp' => (is => 'rw', isa => 'Object', required => 1,
+	      default => sub{ Array::Compare->new } );
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
 
+#Remind me of stat:
+#    7 size     total size of file, in bytes
+#    8 atime    last access time in seconds since the epoch
+#    9 mtime    last modify time in seconds since the epoch
+#   10 ctime    inode change time in seconds since the epoch (*)
+
+#clean seen files from dispatch list
+
 override '_dispatch' => sub{
-    my ($self, $kernel, $fname, $fpath) = @_[OBJECT, KERNEL, ARG0, ARG1];
+    my ($self, $kernel, $fname,$fpath) = @_[OBJECT, KERNEL, ARG0, ARG1];
 
-    return if( $self->seen_files->{ $fpath } );
-    $self->seen_files->{ $fpath } = 1;
-    super(@_);
+    if( exists $self->seen_files->{ $fpath } ){
+	return if $self->cmp->compare( $self->seen_files->{ $fpath }, 
+				       [ ( stat($fpath) )[7..10] ]); 
+    } 
+    
+    $self->seen_files->{$fpath} = [ ( stat($fpath) )[7..10] ];
+    $kernel->yield(callback => [$fname, $fpath]) 
+	if $self->filter->($fname,$fpath);
 };
 
-before '_poll' => sub{
-    my $self = shift;
-
-    %{ $self->seen_files } = map {$_ => $self->seen_files->{$_} } 
-	grep {-e $_ } keys %{ $self->seen_files };
-};
 
 1;
 
@@ -36,14 +45,14 @@ __END__;
 
 =head1 NAME
 
-POE::Component::DirWatch::Object::NewFile
+POE::Component::DirWatch::Object::Touched
 
 =head1 SYNOPSIS
 
-  use POE::Component::DirWatch::Object::NewFile;
+  use POE::Component::DirWatch::Object::Touched;
 
-  #$watcher is a PoCo::DW:Object::NewFile 
-  my $watcher = POE::Component::DirWatch::Object::NewFile->new
+  #$watcher is a PoCo::DW:Object::Touched 
+  my $watcher = POE::Component::DirWatch::Object::Touched->new
     (
      alias      => 'dirwatch',
      directory  => '/some_dir',
@@ -56,27 +65,29 @@ POE::Component::DirWatch::Object::NewFile
 
 =head1 DESCRIPTION
 
-POE::Component::DirWatch::Object::NewFile extends DirWatch::Object in order to 
-exclude files that have already been processed 
+POE::Component::DirWatch::Object::Touched extends DirWatch::Object::NewFile in order to 
+exclude files that have already been processed, but still pick up files that have been 
+changed.
 
 =head1 Accessors
 
 =head2 seen_files
 
 Read-write. Will return a hash ref in with keys will be the full path 
-of all previously processed documents.
+of all previously processed documents that still exist in the file system and the
+values are listrefs containing the size and last changed dates of the files. 
+C<[ ( stat($file) )[7..10] ]>
+
+=head2 cmp
+
+An Array::Compare object
 
 =head1 Extended methods
 
 =head2 dispatch
 
-C<override 'dispatch'>  Don't dispatch if file has been seen.
-
-=head2 poll
-
-C<before 'poll'> the list of known files is checked and if any of the files no 
-longer exist they are removed from the list of known files to avoid the list 
-growing out of control.
+C<override 'dispatch'>  Don't dispatch if file has been seen before and has the
+same values for C<stat($file)[7..10]>
 
 =head2 meta
 
@@ -90,6 +101,11 @@ L<POE::Component::DirWatch::Object>, L<Moose>
 
 Guillermo Roditi, <groditi@cpan.org>
 
+=head1 BUGS
+
+If a file is created and deleted between polls it will never be seen. Also if a file
+is edited more than once in between polls it will never be picked up.
+
 Please report any bugs or feature requests to
 C<bug-poe-component-dirwatch-object at rt.cpan.org>, or through the web interface at
 L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=POE-Component-DirWatch-Object>.
@@ -100,7 +116,7 @@ your bug as I make changes.
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc POE::Component::DirWatch::Object::NewFile
+    perldoc POE::Component::DirWatch::Object::Touched
 
 You can also look for information at:
 

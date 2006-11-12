@@ -1,19 +1,20 @@
-use strict;
-use warnings;
-use ExtUtils::MakeMaker;
+#! /usr/bin/perl -w
 
-WriteMakefile
-    (
-     NAME                => 'POE::Component::DirWatch::Object',
-     AUTHOR              => 'Guillermo Roditi <groditi@cpan.org>',
-     VERSION_FROM        => 'lib/POE/Component/DirWatch/Object.pm',
-     ABSTRACT_FROM       => 'lib/POE/Component/DirWatch/Object.pm',
-     PL_FILES            => {},
-     PREREQ_PM => {
-		   'Test::More' => 0,
-		   'POE' => 0.12,
-		   'Moose' => 0.05,
-		  },
-     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-     clean               => { FILES => 'POE-Component-DirWatch-Object-*' },
-    );
+# Load the Module::Install bundled in ./inc/
+use inc::Module::Install;
+
+# Define metadata
+name 'POE-Component-DirWatch-Object';
+abstract 'Directory watcher for POE';
+all_from 'lib/POE/Component/DirWatch/Object.pm';
+
+# Specific dependencies
+requires 'Test::More'     => 0;
+requires 'POE'            => 0.12;
+requires 'Moose'          => 0.05;
+requires 'Array::Compare' => 1.13;
+
+no_index directory => 'dist';
+    
+auto_install;
+WriteAll;

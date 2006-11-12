@@ -63,7 +63,7 @@ sub _tstop{
 }
 
 sub file_found{
-    my ($kernel, $file, $pathname) = @_[KERNEL, ARG0, ARG1];
+    my ($file, $pathname) = @_;
 
     ok(1, 'callback has been called');
     ok(exists $FILES{$file}, 'correct file');
@@ -73,8 +73,8 @@ sub file_found{
     # don't loop
     if (++$state == keys %FILES) {
         is_deeply(\%FILES, \%seen, 'seen all files');
-	$kernel->state("endtest",  sub{ $_[KERNEL]->post(CharlieCard => '_endtest') });
-	$kernel->delay("endtest", 5);
+	$poe_kernel->state("endtest",  sub{ $_[KERNEL]->post(CharlieCard => '_endtest') });
+	$poe_kernel->delay("endtest", 6);
     } elsif ($state > keys %FILES) {
         rmtree $DIR;
         die "We seem to be looping, bailing out\n";

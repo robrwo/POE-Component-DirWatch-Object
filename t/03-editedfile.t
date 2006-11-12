@@ -10,11 +10,11 @@ use POE;
 
 our %FILES = (foo => 2, bar => 1);
 use Test::More;
-plan tests => 4 + 3 * ((keys %FILES) +1 );
-use_ok('POE::Component::DirWatch::Object::NewFile');
+plan tests => 5 + 3 * ( (keys %FILES) +1 );
+use_ok('POE::Component::DirWatch::Object::Touched');
 
 our $DIR   = File::Spec->catfile($Bin, 'watch');
-our $state = -1;
+our $state = 0;
 our %seen;
 
 POE::Session->create(
@@ -45,16 +45,15 @@ sub _tstart {
 	}
 
 
-	my $watcher =  POE::Component::DirWatch::Object::NewFile->new
+	my $watcher =  POE::Component::DirWatch::Object::Touched->new
 	    (
 	     alias      => 'dirwatch_test',
 	     directory  => $DIR,
 	     callback   => \&file_found,
 	     interval   => 1,
-	     edited     => 1,
 	    );
 
-	ok($watcher->alias eq 'dirwatch_test');
+	ok($watcher->alias eq 'dirwatch_test', 'Alias Works');
 
     }
 
@@ -64,26 +63,29 @@ sub _tstop{
 }
 
 sub file_found{
-    my ($kernel, $file, $pathname) = @_[KERNEL, ARG0, ARG1];
+    my ($file, $pathname) = @_;
+    #warn($file."\n");
 
     ok(1, 'callback has been called');
     ok(exists $FILES{$file}, 'correct file');
     ++$seen{$file};
     is($pathname, File::Spec->catfile($DIR, $file), 'correct path');
 
-    # don't loop
-    if (++$state == keys %FILES) {
-        is_deeply(\%FILES, \%seen, 'seen all files');
-	ok($seen{foo} == 2," Picked up edited file");
-	$kernel->state("endtest",  sub{ $_[KERNEL]->post(CharlieCard => '_endtest') });
-	$kernel->delay("endtest", 5);
-    } elsif ($state > keys %FILES) {
-        rmtree $DIR;
-        die "We seem to be looping, bailing out\n";
-    } elsif($state == (keys %FILES) -1 ){
+    if(++$state == (keys %FILES) ){
+	#warn("**********************************");
 	my $path = File::Spec->catfile($DIR, 'foo');
 	utime time, time, $path;
+	ok(1, 'Touching $path');
+    } elsif ($state == (keys %FILES) + 1 ) {
+        is_deeply(\%FILES, \%seen, 'seen all files');
+	ok($seen{foo} == 2," Picked up edited file");
+	$poe_kernel->state("endtest",  sub{ $_[KERNEL]->post(CharlieCard => '_endtest') });
+	$poe_kernel->delay("endtest", 5);
+    } elsif ($state > (keys %FILES) + 1 ) {
+        rmtree $DIR;
+        die "We seem to be looping, bailing out\n";
     }
+
 }
 
 __END__

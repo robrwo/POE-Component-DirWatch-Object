@@ -1,4 +1,28 @@
 Revision history for POE-Component-DirWatch-Object
+0.06    Nov 11, 2006
+	*********** INCOMPATIBLE CHANGE ************
+	**  Changed callback behavior to match docs!!!!
+	** Bug as reported by: melo
+	**  http://rt.cpan.org/Public/Bug/Display.html?id=22759
+	**callback no longer gets POE vars!!!!!
+	************************************************************
+
+        Change the way polls are scheduled to minimize unneeded events
+        Added Untouched and Touched
+        Realized that POEing in Moose is really freaking confusing at times
+	Groundwork for async dir polling is done.
+	Add pause and resume support
+	move to Module::Install
+	Goodbye dispatch lists and batch dispatching!!!
+	Goodbye to a few functions. Needed change but may break some of
+	your subclassed modules. Sorry!
+	Started thinking about moving the poll functionality out so I can
+	have support for things like IO::AIO, EventNotify, etc
+	Probably added some bugs 
+
+0.05	Aug 16, 2006
+	You store $session and you go to hell. You go to hell and you die.
+	add default=> 's
 
 0.04    Aug 15, 2006
         I still suck at POD.

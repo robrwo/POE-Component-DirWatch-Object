@@ -10,6 +10,12 @@ use POE;
 
 our %FILES = map { $_ =>  1 } qw(foo bar);
 use Test::More;
+plan tests => 1;
+use_ok('POE::Component::DirWatch::Object::Untouched');
+
+exit;
+#####i knooooooowwwww i knoooow
+
 plan tests => 4 + 3 * keys %FILES;
 use_ok('POE::Component::DirWatch::Object');
 
@@ -34,6 +40,7 @@ exit 0;
 sub _tstart {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 
+	$kernel->alias_set("CharlieCard");
 
 	# create a test directory with some test files
 	rmtree $DIR;
@@ -61,7 +68,7 @@ sub _tstop{
 }
 
 sub file_found{
-    my ($file, $pathname) = @_;
+    my ( $file, $pathname) = @_;
 
     ok(1, 'callback has been called');
     ok(exists $FILES{$file}, 'correct file');

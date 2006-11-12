@@ -10,7 +10,7 @@ use POE;
 
 our %FILES = map { $_ =>  1 } qw(foo bar);
 use Test::More;
-plan tests => 4 + 3 * keys %FILES;
+plan tests => 4 + 3 * (keys %FILES);
 use_ok('POE::Component::DirWatch::Object');
 
 our $DIR   = File::Spec->catfile($Bin, 'watch');
@@ -34,6 +34,7 @@ exit 0;
 sub _tstart {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 
+	my $testobj = DWTestObject->new;;
 
 	# create a test directory with some test files
 	rmtree $DIR;
@@ -48,7 +49,7 @@ sub _tstart {
 	    (
 	     alias      => 'dirwatch_test',
 	     directory  => $DIR,
-	     callback   => \&file_found,
+	     callback   => [$testobj, 'file_found'],
 	     interval   => 1,
 	    );
 
@@ -60,8 +61,16 @@ sub _tstop{
     rmtree $DIR;
 }
 
+package DWTestObject;
+use Moose;
+use File::Spec;
+use File::Path qw(rmtree);
+use POE;
+use Test::More;
+plan tests => 1 + 3 * keys %FILES;
+
 sub file_found{
-    my ($file, $pathname) = @_;
+    my ($self, $file, $pathname) = @_;
 
     ok(1, 'callback has been called');
     ok(exists $FILES{$file}, 'correct file');
@@ -77,5 +86,6 @@ sub file_found{
         die "We seem to be looping, bailing out\n";
     }
 }
+
 
 __END__

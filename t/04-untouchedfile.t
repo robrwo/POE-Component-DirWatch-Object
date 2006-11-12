@@ -8,20 +8,25 @@ use File::Spec;
 use File::Path qw(rmtree);
 use POE;
 
-our %FILES = map { $_ =>  1 } qw(foo bar);
+our %FILES = (foo => 2, bar => 1);
 use Test::More;
-plan tests => 4 + 3 * keys %FILES;
-use_ok('POE::Component::DirWatch::Object');
+plan tests => 1;
+use_ok('POE::Component::DirWatch::Object::Untouched');
+
+exit;
+
+#i'llfix it. i promise
 
 our $DIR   = File::Spec->catfile($Bin, 'watch');
-our $state = 0;
+our $state = -1;
 our %seen;
 
 POE::Session->create(
      inline_states => 
      {
-      _start       => \&_tstart,
-      _stop        => \&_tstop,
+      _start   => \&_tstart,
+      _stop    => \&_tstop,
+      _endtest => sub { $_[KERNEL]->post(dirwatch_test => 'shutdown') }
      },
     );
 
@@ -34,6 +39,7 @@ exit 0;
 sub _tstart {
 	my ($kernel, $heap) = @_[KERNEL, HEAP];
 
+	$kernel->alias_set("CharlieCard");
 
 	# create a test directory with some test files
 	rmtree $DIR;
@@ -44,15 +50,18 @@ sub _tstart {
 	    close FH;
 	}
 
-	my $watcher =  POE::Component::DirWatch::Object->new
+
+	my $watcher =  POE::Component::DirWatch::Object::NewFile->new
 	    (
 	     alias      => 'dirwatch_test',
 	     directory  => $DIR,
 	     callback   => \&file_found,
 	     interval   => 1,
+	     edited     => 1,
 	    );
 
 	ok($watcher->alias eq 'dirwatch_test');
+
     }
 
 sub _tstop{
@@ -71,10 +80,15 @@ sub file_found{
     # don't loop
     if (++$state == keys %FILES) {
         is_deeply(\%FILES, \%seen, 'seen all files');
-        $poe_kernel->post(dirwatch_test => 'shutdown');
+	ok($seen{foo} == 2," Picked up edited file");
+	$poe_kernel->state("endtest",  sub{ $_[KERNEL]->post(CharlieCard => '_endtest') });
+	$poe_kernel->delay("endtest", 5);
     } elsif ($state > keys %FILES) {
         rmtree $DIR;
         die "We seem to be looping, bailing out\n";
+    } elsif($state == (keys %FILES) -1 ){
+	my $path = File::Spec->catfile($DIR, 'foo');
+	utime time, time, $path;
     }
 }
 

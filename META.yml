@@ -1,17 +1,17 @@
 abstract: Directory watcher for POE
-author: 'Guillermo Roditi, <groditi@cpan.org>'
+author: Guillermo Roditi, <groditi@cpan.org>
 distribution_type: module
 generated_by: Module::Install version 0.64
 license: perl
 name: POE-Component-DirWatch-Object
-no_index:
-  directory:
+no_index: 
+  directory: 
     - dist
     - inc
     - t
-requires:
+requires: 
   Array::Compare: 1.13
   Moose: 0.05
   POE: 0.12
   Test::More: 0
-version: 0.06
+version: 0.07

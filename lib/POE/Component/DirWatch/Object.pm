@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.06";
+our $VERSION = "0.07";
 use File::Spec;
 use Carp;
 use POE;
@@ -47,6 +47,7 @@ sub session{
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
+
 sub _start{
     my ($self, $kernel) = @_[OBJECT, KERNEL];
 
@@ -60,20 +61,21 @@ sub _pause{
     my ($self, $kernel, $until) = @_[OBJECT, KERNEL, ARG0];
     $kernel->alarm_remove($self->next_poll) if $self->next_poll;
     return unless defined $until;
-
+    
     my $t = time;
-    $self->next_poll( $kernel->delay_set(poll => $until) )if($until <  time);
-    $self->next_poll( $kernel->alarm_set(poll => $until) )if($until >= time);
+    $until += $t if $t > $until;
+    $self->next_poll( $kernel->alarm_set(poll => $until) );
+
 }
 
 sub _resume{
-    my ($self, $kernel, $until) = @_[OBJECT, KERNEL, ARG0];
+    my ($self, $kernel, $when) = @_[OBJECT, KERNEL, ARG0];
     $kernel->alarm_remove($self->next_poll) if $self->next_poll;
-    $until = 0 unless defined $until;
+    $when = 0 unless defined $when;
 
     my $t = time;
-    $self->next_poll( $kernel->delay_set(poll => $until) )if($until <  time);
-    $self->next_poll( $kernel->alarm_set(poll => $until) )if($until >= time);
+    $when += $t if $t > $when;
+    $self->next_poll( $kernel->alarm_set(poll => $when) );    
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
@@ -97,11 +99,15 @@ sub _poll{
     #aio_readdir($self->directory, sub{ $self->_aio_callback(@_) } );
 
     #until i figure out AIO this will have to be good enough
-    opendir(DIR, $self->directory) || croak "Failed to open '".$self->directory."':  $!";
-    my @files = grep { $_ !~ /^\.\.?$/ } readdir(DIR);
-    closedir DIR;
-    $self->_aio_callback(\@files);
-    
+    my @files;
+    eval {
+	opendir(DIR, $self->directory) || 
+	    die "Failed to open '".$self->directory."':  $!";
+	@files = grep { $_ !~ /^\.\.?$/ } readdir(DIR);
+	closedir DIR;
+    } || carp($@);
+	
+    $self->_aio_callback(\@files);    
 }
 
 sub _aio_callback{
@@ -183,6 +189,10 @@ meant to be covered in a similar way there is some subtle differences.
 
 Its primary intended use is processing a "drop-box" style
 directory, such as an FTP upload directory.
+
+Apparently the original DirWatch no longer exists. Yes, I know Moose is a bit heavy
+but I don't really care. The original is still on BackPAN if you don't like my
+awesome replacement.
 
 =head1 Public Methods
 
@@ -337,11 +347,13 @@ Constructor. C<create()>s a L<POE::Session> and stores it in C<$self-E<gt>sessio
 
 =head2 meta
 
-Todo
+Test Happiness.
 
 =head1 TODO
 
 =over 4
+
+=item C<IO::AIO> is b0rken on FreeBSD so I can't add support until it works
 
 =item Use C<Win32::ChangeNotify> on Win32 platforms for better performance.
 

@@ -8,15 +8,9 @@ use File::Spec;
 use File::Path qw(rmtree);
 use POE;
 
-our %FILES = map { $_ =>  1 } qw(foo bar);
+our %FILES = map { $_ =>  1 } qw(foo);
 use Test::More;
-plan tests => 1;
-use_ok('POE::Component::DirWatch::Object::Untouched');
-
-exit;
-#####i knooooooowwwww i knoooow
-
-plan tests => 4 + 3 * keys %FILES;
+plan tests => 7;
 use_ok('POE::Component::DirWatch::Object');
 
 our $DIR   = File::Spec->catfile($Bin, 'watch');
@@ -63,25 +57,33 @@ sub _tstart {
     }
 
 sub _tstop{
-    my $heap = $_[HEAP];
-    rmtree $DIR;
+    my $heap = $_[HEAP];    
+    ok(rmtree $DIR, 'Proper cleanup detected');
 }
 
+my $time;
 sub file_found{
     my ( $file, $pathname) = @_;
 
-    ok(1, 'callback has been called');
-    ok(exists $FILES{$file}, 'correct file');
-    ++$seen{$file};
-    is($pathname, File::Spec->catfile($DIR, $file), 'correct path');
-
-    # don't loop
-    if (++$state == keys %FILES) {
-        is_deeply(\%FILES, \%seen, 'seen all files');
-        $poe_kernel->post(dirwatch_test => 'shutdown');
-    } elsif ($state > keys %FILES) {
+    if(++$state == 1){
+	$time = time + 3;
+	$poe_kernel->post(dirwatch_test => '_pause', $time);
+    } elsif($state == 2){
+	ok($time <= time, "Pause Until Works");
+	$time = time + 3;
+	$poe_kernel->post(dirwatch_test => '_pause');
+	$poe_kernel->post(dirwatch_test => '_resume',$time);
+    } elsif($state == 3){
+	ok($time <= time, "Pause - Resume When Works");
+	$time = time + 3;
+	$poe_kernel->post(dirwatch_test => '_pause');
+	$poe_kernel->post(dirwatch_test => '_resume',$time);
+    } elsif($state == 4){
+	ok($time <= time, "Resume When Works");
+	$poe_kernel->post(dirwatch_test => 'shutdown');
+    } else {
         rmtree $DIR;
-        die "We seem to be looping, bailing out\n";
+        die "Something is wrong, bailing out!\n";
     }
 }
 

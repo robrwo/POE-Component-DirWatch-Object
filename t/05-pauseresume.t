@@ -7,6 +7,7 @@ use FindBin    qw($Bin);
 use File::Spec;
 use File::Path qw(rmtree);
 use POE;
+use Time::HiRes;
 
 our %FILES = map { $_ =>  1 } qw(foo);
 use Test::More;
@@ -18,7 +19,7 @@ our $state = 0;
 our %seen;
 
 POE::Session->create(
-     inline_states => 
+     inline_states =>
      {
       _start       => \&_tstart,
       _stop        => \&_tstop,
@@ -32,32 +33,32 @@ ok(1, 'Proper shutdown detected');
 exit 0;
 
 sub _tstart {
-	my ($kernel, $heap) = @_[KERNEL, HEAP];
+        my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-	$kernel->alias_set("CharlieCard");
+        $kernel->alias_set("CharlieCard");
 
-	# create a test directory with some test files
-	rmtree $DIR;
-	mkdir($DIR, 0755) or die "can't create $DIR: $!\n";
-	for my $file (keys %FILES) {
-	    my $path = File::Spec->catfile($DIR, $file);
-	    open FH, ">$path" or die "can't create $path: $!\n";
-	    close FH;
-	}
+        # create a test directory with some test files
+        rmtree $DIR;
+        mkdir($DIR, 0755) or die "can't create $DIR: $!\n";
+        for my $file (keys %FILES) {
+            my $path = File::Spec->catfile($DIR, $file);
+            open FH, ">$path" or die "can't create $path: $!\n";
+            close FH;
+        }
 
-	my $watcher =  POE::Component::DirWatch::Object->new
-	    (
-	     alias      => 'dirwatch_test',
-	     directory  => $DIR,
-	     callback   => \&file_found,
-	     interval   => 1,
-	    );
+        my $watcher =  POE::Component::DirWatch::Object->new
+            (
+             alias      => 'dirwatch_test',
+             directory  => $DIR,
+             callback   => \&file_found,
+             interval   => 1,
+            );
 
-	ok($watcher->alias eq 'dirwatch_test');
+        ok($watcher->alias eq 'dirwatch_test');
     }
 
 sub _tstop{
-    my $heap = $_[HEAP];    
+    my $heap = $_[HEAP];
     ok(rmtree $DIR, 'Proper cleanup detected');
 }
 
@@ -66,21 +67,21 @@ sub file_found{
     my ( $file, $pathname) = @_;
 
     if(++$state == 1){
-	$time = time + 3;
-	$poe_kernel->post(dirwatch_test => '_pause', $time);
+        $time = time + 3;
+        $poe_kernel->post(dirwatch_test => '_pause', $time);
     } elsif($state == 2){
-	ok($time <= time, "Pause Until Works");
-	$time = time + 3;
-	$poe_kernel->post(dirwatch_test => '_pause');
-	$poe_kernel->post(dirwatch_test => '_resume',$time);
+        ok($time <= time, "Pause Until Works");
+        $time = time + 3;
+        $poe_kernel->post(dirwatch_test => '_pause');
+        $poe_kernel->post(dirwatch_test => '_resume',$time);
     } elsif($state == 3){
-	ok($time <= time, "Pause - Resume When Works");
-	$time = time + 3;
-	$poe_kernel->post(dirwatch_test => '_pause');
-	$poe_kernel->post(dirwatch_test => '_resume',$time);
+        ok($time <= time, "Pause - Resume When Works");
+        $time = time + 3;
+        $poe_kernel->post(dirwatch_test => '_pause');
+        $poe_kernel->post(dirwatch_test => '_resume',$time);
     } elsif($state == 4){
-	ok($time <= time, "Resume When Works");
-	$poe_kernel->post(dirwatch_test => 'shutdown');
+        ok($time <= time, "Resume When Works");
+        $poe_kernel->post(dirwatch_test => 'shutdown');
     } else {
         rmtree $DIR;
         die "Something is wrong, bailing out!\n";

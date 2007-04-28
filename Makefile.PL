@@ -13,8 +13,7 @@ requires 'Test::More'     => 0;
 requires 'POE'            => 0.12;
 requires 'Moose'          => 0.05;
 requires 'Array::Compare' => 1.13;
+requires 'Time::HiRes'    => 0;
 
-no_index directory => 'dist';
-    
 auto_install;
 WriteAll;

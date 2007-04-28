@@ -1,4 +1,3 @@
-.cvsignore
 Changes
 inc/Module/AutoInstall.pm
 inc/Module/Install.pm
@@ -27,6 +26,5 @@ t/04-untouchedfile.t
 t/05-pauseresume.t
 t/06-arrayrefcallback.t
 t/boilerplate.t
-t/inc/Module/Install.pm
 t/pod-coverage.t
 t/pod.t

@@ -1,4 +1,6 @@
 Revision history for POE-Component-DirWatch-Object
+0.09    Apr 28, 2007
+        Shutdown convenience method fixed. typo, eeek. 
 0.08    Apr 28, 2007
         Shutdown convenience method
         use HiRes in tests. i think it caused a failure somewhere

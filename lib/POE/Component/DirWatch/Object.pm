@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.08";
+our $VERSION = "0.09";
 use File::Spec;
 use Carp;
 use POE;
@@ -92,7 +92,7 @@ sub resume{
 
 sub shutdown{
     my ($self) = @_;
-    $poe_kernel->post($self->alias, '_shutdown');
+    $poe_kernel->post($self->alias, 'shutdown');
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#

@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.09";
+our $VERSION = "0.10";
 use File::Spec;
 use Carp;
 use POE;
@@ -13,7 +13,8 @@ use POE;
 has 'alias'      => (is => 'rw', isa => 'Str', required => 1,
                      default => 'dirwatch');
 
-has 'next_poll' => (is => 'rw', isa => 'Int');
+has 'next_poll' => (is => 'rw', isa => 'Int', required => 0,
+                    clearer => 'clear_next_poll', predicate => 'has_next_poll');
 has 'callback'  => (is => 'rw', isa => 'Ref', required => 1);
 has 'directory' => (is => 'rw', isa => 'Str', required => 1);
 has 'interval'  => (is => 'rw', isa => 'Int', required => 1, default => 1);
@@ -59,7 +60,8 @@ sub _start{
 
 sub _pause{
     my ($self, $kernel, $until) = @_[OBJECT, KERNEL, ARG0];
-    $kernel->alarm_remove($self->next_poll) if $self->next_poll;
+    $kernel->alarm_remove($self->next_poll) if $self->has_next_poll;
+    $self->clear_next_poll;
     return unless defined $until;
 
     my $t = time;
@@ -70,7 +72,8 @@ sub _pause{
 
 sub _resume{
     my ($self, $kernel, $when) = @_[OBJECT, KERNEL, ARG0];
-    $kernel->alarm_remove($self->next_poll) if $self->next_poll;
+    $kernel->alarm_remove($self->next_poll) if $self->has_next_poll;
+    $self->clear_next_poll;
     $when = 0 unless defined $when;
 
     my $t = time;
@@ -92,13 +95,15 @@ sub resume{
 
 sub shutdown{
     my ($self) = @_;
+    $poe_kernel->alarm_remove($self->next_poll) if $self->has_next_poll;
+    $self->clear_next_poll;
     $poe_kernel->post($self->alias, 'shutdown');
 }
 
 #--------#---------#---------#---------#---------#---------#---------#---------#
 sub _poll{
     my ($self, $kernel) = @_[OBJECT, KERNEL];
-    $self->next_poll( undef );
+    $self->clear_next_poll;
 
     #AIO?? maybe one day...
     #aio_readdir($self->directory, sub{ $self->_aio_callback(@_) } );
@@ -283,7 +288,10 @@ If not specified, defaults to C<sub { -f $_[1] }>.
 
 =head2 next_poll
 
-The ID of the alarm for the next scheduled poll, if any.
+The ID of the alarm for the next scheduled poll, if any. Has clearer
+and predicate methods named C<clear_next_poll> and C<has_next_poll>.
+Please note that clearing the C<next_poll> just clears the next poll id,
+it does not remove the alarm, please use C<pause> for that.
 
 =head1 Private methods
 

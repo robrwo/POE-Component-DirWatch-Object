@@ -1,4 +1,6 @@
 Revision history for POE-Component-DirWatch-Object
+0.10    Apr 30, 2007
+        Do things the right way with predicates and clearers
 0.09    Apr 28, 2007
         Shutdown convenience method fixed. typo, eeek. 
 0.08    Apr 28, 2007

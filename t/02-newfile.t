@@ -10,7 +10,8 @@ use POE;
 
 our %FILES = map { $_ =>  1 } qw(foo bar);
 use Test::More;
-plan tests => 3 + 3 * keys %FILES;
+use Test::Warnings;
+
 use_ok('POE::Component::DirWatch::Object::NewFile');
 
 our $DIR   = File::Spec->catfile($Bin, 'watch');
@@ -18,7 +19,7 @@ our $state = 0;
 our %seen;
 
 POE::Session->create(
-     inline_states => 
+     inline_states =>
      {
       _start   => \&_tstart,
       _stop    => \&_tstop,
@@ -28,6 +29,9 @@ POE::Session->create(
 
 
 $poe_kernel->run();
+
+done_testing;
+
 exit 0;
 
 sub _tstart {
@@ -81,4 +85,5 @@ sub file_found{
     }
 }
 
-__END__
+
+

@@ -4,7 +4,7 @@ use warnings;
 use Moose;
 use POE;
 
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 
 extends 'POE::Component::DirWatch::Object';
 
@@ -17,13 +17,13 @@ override '_dispatch' => sub{
 
     return if( $self->seen_files->{ $fpath } );
     $self->seen_files->{ $fpath } = 1;
-    super(@_);
+    super;
 };
 
 before '_poll' => sub{
     my $self = shift;
 
-    %{ $self->seen_files } = map {$_ => $self->seen_files->{$_} } 
+    %{ $self->seen_files } = map {$_ => $self->seen_files->{$_} }
 	grep {-e $_ } keys %{ $self->seen_files };
 };
 
@@ -42,7 +42,7 @@ POE::Component::DirWatch::Object::NewFile
 
   use POE::Component::DirWatch::Object::NewFile;
 
-  #$watcher is a PoCo::DW:Object::NewFile 
+  #$watcher is a PoCo::DW:Object::NewFile
   my $watcher = POE::Component::DirWatch::Object::NewFile->new
     (
      alias      => 'dirwatch',
@@ -56,14 +56,14 @@ POE::Component::DirWatch::Object::NewFile
 
 =head1 DESCRIPTION
 
-POE::Component::DirWatch::Object::NewFile extends DirWatch::Object in order to 
-exclude files that have already been processed 
+POE::Component::DirWatch::Object::NewFile extends DirWatch::Object in order to
+exclude files that have already been processed
 
 =head1 Accessors
 
 =head2 seen_files
 
-Read-write. Will return a hash ref in with keys will be the full path 
+Read-write. Will return a hash ref in with keys will be the full path
 of all previously processed documents.
 
 =head1 Extended methods
@@ -74,8 +74,8 @@ C<override 'dispatch'>  Don't dispatch if file has been seen.
 
 =head2 poll
 
-C<before 'poll'> the list of known files is checked and if any of the files no 
-longer exist they are removed from the list of known files to avoid the list 
+C<before 'poll'> the list of known files is checked and if any of the files no
+longer exist they are removed from the list of known files to avoid the list
 growing out of control.
 
 =head2 meta

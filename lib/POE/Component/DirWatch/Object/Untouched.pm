@@ -25,19 +25,19 @@ before '_start' => sub{
     my ($self, $kernel) = @_[OBJECT, KERNEL];
     $kernel->state('stat_check', $self, '_stat_check');
 };
-    
+
 override '_dispatch' => sub{
     my ($self, $kernel, @params) = @_[OBJECT, KERNEL, ARG0, ARG1];
     return unless $self->filter->(@params);
 
-    $kernel->delay(stat_check => $self->stat_interval, 
+    $kernel->delay(stat_check => $self->stat_interval,
 		   \@params, [ ( stat($_->[1]) )[7..10] ]
-		  ) 
+		  )
 };
-    
+
 sub _stat_check{
     my ($self, $kernel, $params, $stats) = @_[OBJECT, KERNEL, ARG0, ARG1];
-    $kernel->yield(callback => $params) 
+    $kernel->yield(callback => $params)
 	if $self->cmp->compare($stats, [ ( stat($params->[1]) )[7..10] ]);
 }
 
@@ -57,7 +57,7 @@ POE::Component::DirWatch::Object::Untouched
 
   use POE::Component::DirWatch::Object::Untouched;
 
-  #$watcher is a PoCo::DW:Object::Untouched 
+  #$watcher is a PoCo::DW:Object::Untouched
   my $watcher = POE::Component::DirWatch::Object::Untouched->new
     (
      alias         => 'dirwatch',
@@ -72,7 +72,7 @@ POE::Component::DirWatch::Object::Untouched
 
 =head1 DESCRIPTION
 
-POE::Component::DirWatch::Object::Untouched extends DirWatch::Object in order to 
+POE::Component::DirWatch::Object::Untouched extends DirWatch::Object in order to
 exclude files that appear to be in use or are actively being changed.
 
 =head1 Accessors
@@ -81,8 +81,8 @@ exclude files that appear to be in use or are actively being changed.
 
 Read-Write. An integer value that specifies how many seconds to wait in between the
 call to dispatch and the actual dispatch. The interval here serves as a dead period
-in between when the initial stat readings are made and the second reading is made 
-(the one that determines whether there was any change or not). Note that the 
+in between when the initial stat readings are made and the second reading is made
+(the one that determines whether there was any change or not). Note that the
 C<interval> in C<POE::Component::DirWatch::Object> will be delayed by this length.
 See C<_stat_check> for details.
 
@@ -105,7 +105,7 @@ Filtering still happens at this stage.
 
 =head2 _stat_check
 
-Schedule a callback event for every file whose contents have not changed since the 
+Schedule a callback event for every file whose contents have not changed since the
 C<poll> event. After all callbacks are scheduled, set an alarm for the next poll.
 
 ARG0 should be the proper params for C<callback> and ARG1 the original C<stat()>

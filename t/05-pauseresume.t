@@ -67,16 +67,16 @@ sub file_found{
     my ( $file, $pathname) = @_;
 
     if(++$state == 1){
-        $time = time + 4;
+        $time = time + 5;
         $poe_kernel->post(dirwatch_test => '_pause', $time);
     } elsif($state == 2){
         ok($time <= time, "Pause Until Works");
-        $time = time + 4;
+        $time = time + 5;
         $poe_kernel->post(dirwatch_test => '_pause');
         $poe_kernel->post(dirwatch_test => '_resume',$time);
     } elsif($state == 3){
         ok($time <= time, "Pause - Resume When Works");
-        $time = time + 4;
+        $time = time + 5;
         $poe_kernel->post(dirwatch_test => '_pause');
         $poe_kernel->post(dirwatch_test => '_resume',$time);
     } elsif($state == 4){

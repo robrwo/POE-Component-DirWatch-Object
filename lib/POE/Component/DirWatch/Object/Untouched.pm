@@ -5,7 +5,7 @@ use Moose;
 use Array::Compare;
 use POE;
 
-our $VERSION = "0.02";
+our $VERSION = "0.1200";
 
 extends 'POE::Component::DirWatch::Object';
 

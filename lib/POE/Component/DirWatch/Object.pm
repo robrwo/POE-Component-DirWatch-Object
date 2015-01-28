@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Moose;
 
-our $VERSION = "0.11";
+our $VERSION = "0.1200";
 use File::Spec;
 use Carp;
 use POE;

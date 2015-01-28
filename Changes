@@ -1,8 +1,9 @@
 Revision history for POE-Component-DirWatch-Object
 
 0.11    2015-01-06
-  - Fixed warning about deprecated call to super [rrwo]
-  - Fixed prereq metadata [rrwo]
+  - Fixed warning about deprecated call to super (RT 191513)
+  - Fixed prereq metadata
+  - Upgraded Module::Install version (RT 101515)
 
 0.10    Apr 30, 2007
         Do things the right way with predicates and clearers

@@ -405,6 +405,8 @@ Based on the L<POE::Component::Dirwatch> code by:
 Eric Cholet, <cholet@logilune.com>
 (I also copy pasted some POD)
 
+Currently maintained by Robert Rothenberg <rrwo@thermeon.com>
+
 =head1 BUGS
 
 Holler?
@@ -415,33 +417,13 @@ L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=POE-Component-DirWatch-Object>.
 I will be notified, and then you'll automatically be notified of progress on
 your bug as I make changes.
 
-=head1 SUPPORT
+=head1 CONTRIBUTING
 
-You can find documentation for this module with the perldoc command.
+The git repository can be found at
+L<https://github.com/robrwo/POE-Component-DirWatch-Object>
 
-    perldoc POE::Component::DirWatch::Object
-
-You can also look for information at:
-
-=over 4
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/POE-Component-DirWatch-Object>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/POE-Component-DirWatch-Object>
-
-=item * RT: CPAN's request tracker
-
+Bugs can be reported
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=POE-Component-DirWatch-Object>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/POE-Component-DirWatch-Object>
-
-=back
 
 =head1 ACKNOWLEDGEMENTS
 

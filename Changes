@@ -5,6 +5,8 @@ Revision history for POE-Component-DirWatch-Object
   - All modules have the same version (RT 101514)
   - Removed trailing whitespace from modules.
   - Increased delay in tests to fix timing issues.
+  - Added link to the GitHub repo and removed extraneous support
+    links.
 
 0.11    2015-01-06
   - Fixed warning about deprecated call to super (RT 191513)
